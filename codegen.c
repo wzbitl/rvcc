@@ -80,7 +80,9 @@ static void genAddr(Node *Nd) {
       printLn("  li t0, %d", Nd->Var->Offset);
       printLn("  add a0, fp, t0");
     } else {
-      printLn("  # 获取全局变量%s的地址", Nd->Var->Name);
+      // 函数或者全局变量
+      printLn("  # 获取%s%s的地址",
+              Nd->Ty->Kind == TY_FUNC ? "函数" : "全局变量", Nd->Var->Name);
       printLn("  la a0, %s", Nd->Var->Name);
     }
     return;
@@ -113,6 +115,7 @@ static void load(Type *Ty) {
   case TY_ARRAY:
   case TY_STRUCT:
   case TY_UNION:
+  case TY_FUNC:
     return;
   case TY_FLOAT:
     printLn("  # 访问a0中存放的地址，取得的值存入fa0");
@@ -575,6 +578,9 @@ static void genExpr(Node *Nd) {
   case ND_FUNCALL: {
     // 计算所有参数的值，正向压栈
     pushArgs(Nd->Args);
+    genExpr(Nd->LHS);
+    // 将a0的值存入t0
+    printLn("  mv t0, a0");
 
     // 反向弹栈，a0->参数1，a1->参数2……
     int GP = 0, FP = 0;
@@ -612,13 +618,13 @@ static void genExpr(Node *Nd) {
 
     if (Depth % 2 == 0) {
       // 偶数深度，sp已经对齐16字节
-      printLn("  # 调用%s函数", Nd->FuncName);
-      printLn("  call %s", Nd->FuncName);
+      printLn("  # 调用函数");
+      printLn("  jalr t0");
     } else {
       // 对齐sp到16字节的边界
-      printLn("  # 对齐sp到16字节的边界，并调用%s函数", Nd->FuncName);
+      printLn("  # 对齐sp到16字节的边界，并调用函数");
       printLn("  addi sp, sp, -8");
-      printLn("  call %s", Nd->FuncName);
+      printLn("  jalr t0");
       printLn("  addi sp, sp, 8");
     }
 
