@@ -345,8 +345,19 @@ static void cc1(void) {
   Obj *Prog = parse(Tok);
 
   // 生成代码
+  // Open a temporary output buffer.
+  char *buf;
+  size_t buflen;
+  FILE *output_buf = open_memstream(&buf, &buflen);
+
+  // Traverse the AST to emit assembly.
+  codegen(Prog, output_buf);
+  fclose(output_buf);
+
+  // Write the asembly text to a file.
   FILE *Out = openFile(OutputFile);
-  codegen(Prog, Out);
+  fwrite(buf, buflen, 1, Out);
+  fclose(Out);
 }
 
 // 调用汇编器
