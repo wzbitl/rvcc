@@ -1751,6 +1751,12 @@ static void emitData(Obj *Prog) {
     if (!Align)
       error("Align can not be 0!");
     printLn("  .align %d", simpleLog2(Var->Align));
+
+    if (Var->IsTentative) {
+      printLn("  .comm %s, %d, %d", Var->Name, Var->Ty->Size, Align);
+      continue;
+    }
+
     // 判断是否有初始值
     if (Var->InitData) {
       printLn("\n  # 数据段标签");
