@@ -14,6 +14,9 @@ Type *TyUShort = &(Type){TY_SHORT, 2, 2, true};
 Type *TyUInt = &(Type){TY_INT, 4, 4, true};
 Type *TyULong = &(Type){TY_LONG, 8, 8, true};
 
+Type *TyFloat = &(Type){TY_FLOAT, 4, 4};
+Type *TyDouble = &(Type){TY_DOUBLE, 8, 8};
+
 static Type *newType(TypeKind Kind, int Size, int Align) {
   Type *Ty = calloc(1, sizeof(Type));
   Ty->Kind = Kind;
@@ -34,6 +37,11 @@ bool isUWInt(Type *Ty) {
   TypeKind K = Ty->Kind;
   return Ty->IsUnsigned &&
          (K == TY_BOOL || K == TY_CHAR || K == TY_SHORT || K == TY_INT);
+}
+
+// 判断Type是否为浮点数
+bool isFloNum(Type *Ty) {
+  return Ty->Kind == TY_FLOAT || Ty->Kind == TY_DOUBLE;
 }
 
 // 复制类型
