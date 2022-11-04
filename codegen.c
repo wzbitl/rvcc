@@ -1833,7 +1833,7 @@ static void emitData(Obj *Prog) {
                     : Var->Align;
     if (!Var->Align)
       error("Align can not be 0!");
-    printLn("  .align %d", simpleLog2(Var->Align));
+    Var->Align = simpleLog2(Var->Align);
 
     // Common symbol
     if (OptFCommon && Var->IsTentative) {
@@ -1849,6 +1849,10 @@ static void emitData(Obj *Prog) {
         printLn("  .section .tdata,\"awT\",@progbits");
       else
         printLn("  .data");
+
+      printLn("  .type %s, @object", Var->Name);
+      printLn("  .size %s, %d", Var->Name, Var->Ty->Size);
+      printLn("  .align %d", Align);
       printLn("%s:", Var->Name);
       Relocation *Rel = Var->Rel;
       int Pos = 0;
@@ -1879,6 +1883,8 @@ static void emitData(Obj *Prog) {
       printLn("  .section .tbss,\"awT\",@nobits");
     else
       printLn("  .bss");
+
+    printLn("  .align %d", Align);
     printLn("%s:", Var->Name);
     printLn("  # 全局变量零填充%d位", Var->Ty->Size);
     printLn("  .zero %d", Var->Ty->Size);
@@ -1962,6 +1968,7 @@ void emitText(Obj *Prog) {
     printLn("  .text");
     printLn("# =====%s段开始===============", Fn->Name);
     printLn("# %s段标签", Fn->Name);
+    printLn("  .type %s, @function", Fn->Name);
     printLn("%s:", Fn->Name);
     CurrentFn = Fn;
 
