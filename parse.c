@@ -1151,16 +1151,48 @@ static void stringInitializer(Token **Rest, Token *Tok, Initializer *Init) {
   *Rest = Tok->Next;
 }
 
-// 数组指派器，用于从指定位置开始初始化
-static int arrayDesignator(Token **Rest, Token *Tok, Type *Ty) {
-  Token *Start = Tok;
-  // 获取指定位置的索引
-  int I = constExpr(&Tok, Tok->Next);
-  if (I >= Ty->ArrayLen)
-    errorTok(Start, "array designator index exceeds array bounds");
+// array-designator = "[" const-expr "]"
+//
+// C99 added the designated initializer to the language, which allows
+// programmers to move the "cursor" of an initializer to any element.
+// The syntax looks like this:
+//
+//   int x[10] = { 1, 2, [5]=3, 4, 5, 6, 7 };
+//
+// `[5]` moves the cursor to the 5th element, so the 5th element of x
+// is set to 3. Initialization then continues forward in order, so
+// 6th, 7th, 8th and 9th elements are initialized with 4, 5, 6 and 7,
+// respectively. Unspecified elements (in this case, 3rd and 4th
+// elements) are initialized with zero.
+//
+// Nesting is allowed, so the following initializer is valid:
+//
+//   int x[5][10] = { [5][8]=1, 2, 3 };
+//
+// It sets x[5][8], x[5][9] and x[6][0] to 1, 2 and 3, respectively.
+//
+// Use `.fieldname` to move the cursor for a struct initializer. E.g.
+//
+//   struct { int a, b, c; } x = { .c=5 };
+//
+// The above initializer sets x.c to 5.
+static void arrayDesignator(Token **Rest, Token *Tok, Type *Ty, int *Begin,
+                             int *End) {
+  *Begin = constExpr(&Tok, Tok->Next);
+  if (*Begin >= Ty->ArrayLen)
+    errorTok(Tok, "array designator index exceeds array bounds");
+
+  if (equal(Tok, "...")) {
+    *End = constExpr(&Tok, Tok->Next);
+    if (*End >= Ty->ArrayLen)
+      errorTok(Tok, "array designator index exceeds array bounds");
+    if (*End < *Begin)
+      errorTok(Tok, "array designator range [%d, %d] is empty", *Begin, *End);
+  } else {
+    *End = *Begin;
+  }
+
   *Rest = skip(Tok, "]");
-  // 返回索引值
-  return I;
 }
 
 // struct-designator = "." ident
@@ -1199,12 +1231,14 @@ static void designation(Token **Rest, Token *Tok, Initializer *Init) {
   if (equal(Tok, "[")) {
     if (Init->Ty->Kind != TY_ARRAY)
       errorTok(Tok, "array index in non-array initializer");
-    // 获取索引值
-    int I = arrayDesignator(&Tok, Tok, Init->Ty);
-    // 递归指派
-    designation(&Tok, Tok, Init->Children[I]);
-    // 进行后续初始化
-    arrayInitializer2(Rest, Tok, Init, I + 1);
+
+    int Begin, End;
+    arrayDesignator(&Tok, Tok, Init->Ty, &Begin, &End);
+
+    Token *Tok2;
+    for (int I = Begin; I <= End; I++)
+      designation(&Tok2, Tok, Init->Children[I]);
+    arrayInitializer2(Rest, Tok2, Init, Begin + 1);
     return;
   }
 
@@ -1291,10 +1325,14 @@ static void arrayInitializer1(Token **Rest, Token *Tok, Initializer *Init) {
 
     // 如果存在指派器，那么就解析指派
     if (equal(Tok, "[")) {
-      // 获取最外层指派器的所使用的位置
-      I = arrayDesignator(&Tok, Tok, Init->Ty);
-      // 对该位置进行指派
-      designation(&Tok, Tok, Init->Children[I]);
+      int Begin, End;
+      arrayDesignator(&Tok, Tok, Init->Ty, &Begin, &End);
+
+      Token *Tok2;
+      for (int J = Begin; J <= End; J++)
+        designation(&Tok2, Tok, Init->Children[J]);
+      Tok = Tok2;
+      I = End;
       continue;
     }
 
