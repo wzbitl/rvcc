@@ -265,7 +265,7 @@ static void parseArgs(int Argc, char **Argv) {
       continue;
     }
 
-    if (!strncmp(Argv[I], "-l", 2)) {
+    if (!strncmp(Argv[I], "-l", 2) || !strncmp(Argv[I], "-Wl,", 4)) {
       strArrayPush(&InputPaths, Argv[I]);
       continue;
     }
@@ -889,6 +889,16 @@ int main(int Argc, char **Argv) {
 
     if (!strncmp(Input, "-l", 2)) {
       strArrayPush(&LdArgs, Input);
+      continue;
+    }
+
+    if (!strncmp(Input, "-Wl,", 4)) {
+      char *S = strdup(Input + 4);
+      char *Arg = strtok(S, ",");
+      while (Arg) {
+        strArrayPush(&LdArgs, Arg);
+        Arg = strtok(NULL, ",");
+      }
       continue;
     }
 
