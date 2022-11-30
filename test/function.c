@@ -1199,5 +1199,4 @@ int main() {
   ASSERT(5, (***add2)(2, 3));
 
   printf("OK\n");
-  return 0;
 }
