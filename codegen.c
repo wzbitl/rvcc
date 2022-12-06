@@ -74,17 +74,38 @@ static void genAddr(Node *Nd) {
   switch (Nd->Kind) {
   // 变量
   case ND_VAR:
+    // 局部变量
     if (Nd->Var->IsLocal) { // 偏移量是相对于fp的
       printLn("  # 获取局部变量%s的栈内地址为%d(fp)", Nd->Var->Name,
               Nd->Var->Offset);
       printLn("  li t0, %d", Nd->Var->Offset);
       printLn("  add a0, fp, t0");
-    } else {
-      // 函数或者全局变量
-      printLn("  # 获取%s%s的地址",
-              Nd->Ty->Kind == TY_FUNC ? "函数" : "全局变量", Nd->Var->Name);
-      printLn("  la a0, %s", Nd->Var->Name);
+      return;
     }
+
+    // 函数
+    if (Nd->Ty->Kind == TY_FUNC) {
+      // 定义的函数
+      if (Nd->Var->IsDefinition) {
+        printLn("  # 获取%s%s的地址",
+                Nd->Ty->Kind == TY_FUNC ? "函数" : "全局变量", Nd->Var->Name);
+        printLn("  la a0, %s", Nd->Var->Name);
+      }
+      // 外部函数
+      else {
+        int C = count();
+        printLn(".Lpcrel_hi%d:", C);
+        printLn("  auipc a0, %%got_pcrel_hi(%s)", Nd->Var->Name);
+        printLn("  ld a0, %%pcrel_lo(.Lpcrel_hi%d)(a0)", C);
+      }
+      return;
+    }
+
+    // 全局变量
+    int C = count();
+    printLn(".Lpcrel_hi%d:", C);
+    printLn("  auipc a0, %%got_pcrel_hi(%s)", Nd->Var->Name);
+    printLn("  ld a0, %%pcrel_lo(.Lpcrel_hi%d)(a0)", C);
     return;
   // 解引用*
   case ND_DEREF:
