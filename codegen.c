@@ -114,6 +114,15 @@ static void genAddr(Node *Nd) {
       return;
     }
 
+    // 局部变量
+    if (Nd->Var->IsLocal) { // 偏移量是相对于fp的
+      printLn("  # 获取局部变量%s的栈内地址为%d(fp)", Nd->Var->Name,
+              Nd->Var->Offset);
+      printLn("  li t0, %d", Nd->Var->Offset);
+      printLn("  add a0, fp, t0");
+      return;
+    }
+
     if (OptFPIC) {
       int C = count();
       printLn(".Lpcrel_hi%d:", C);
@@ -125,27 +134,21 @@ static void genAddr(Node *Nd) {
         return;
       }
 
+      // TODO：替换所有的无条件跳转指令
       // 函数或者全局变量
       printLn("  # 获取%s%s的地址",
               Nd->Ty->Kind == TY_FUNC ? "函数" : "全局变量", Nd->Var->Name);
-      printLn("  la a0, %s", Nd->Var->Name);
+      printLn("  auipc a0, %%got_pcrel_hi(%s)", Nd->Var->Name);
+      printLn("  ld a0, %%pcrel_lo(.Lpcrel_hi%d)(a0)", C);
       return;
     }
 
+    // TODO：替换所有的无条件跳转指令
     // Thread-local variable
     if (Nd->Var->IsTLS) {
-      printLn("  lui a0,%%tprel_hi(%s)", Nd->Var->Name);
-      printLn("  add a0,a0,tp,%%tprel_add(%s)", Nd->Var->Name);
-      printLn("  addi a0,a0,%%tprel_lo(%s)", Nd->Var->Name);
-      return;
-    }
-
-    // 局部变量
-    if (Nd->Var->IsLocal) { // 偏移量是相对于fp的
-      printLn("  # 获取局部变量%s的栈内地址为%d(fp)", Nd->Var->Name,
-              Nd->Var->Offset);
-      printLn("  li t0, %d", Nd->Var->Offset);
-      printLn("  add a0, fp, t0");
+      printLn("  lui a0, %%tprel_hi(%s)", Nd->Var->Name);
+      printLn("  add a0, a0, tp, %%tprel_add(%s)", Nd->Var->Name);
+      printLn("  addi a0, a0, %%tprel_lo(%s)", Nd->Var->Name);
       return;
     }
 
@@ -1376,7 +1379,7 @@ static void genExpr(Node *Nd) {
     int StackArgs = pushArgs(Nd);
     genExpr(Nd->LHS);
     // 将a0的值存入t0
-    printLn("  mv t0, a0");
+    printLn("  mv t5, a0");
 
     // 反向弹栈，a0->参数1，a1->参数2……
     int GP = 0, FP = 0;
@@ -1487,7 +1490,7 @@ static void genExpr(Node *Nd) {
 
     // 调用函数
     printLn("  # 调用函数");
-    printLn("  jalr t0");
+    printLn("  jalr t5");
 
     if (Nd->Ty->Kind == TY_LDOUBLE) {
       printLn("  # 保存Long double类型函数的返回值");
@@ -1928,7 +1931,9 @@ static void genStmt(Node *Nd) {
     return;
   // goto语句
   case ND_GOTO:
-    printLn("  j %s", Nd->UniqueLabel);
+    // TODO：替换所有的无条件跳转指令
+    printLn("  la t0, %s", Nd->UniqueLabel);
+    printLn("  jr t0");
     return;
   case ND_GOTO_EXPR:
     genExpr(Nd->LHS);
