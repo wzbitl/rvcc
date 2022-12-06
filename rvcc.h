@@ -236,9 +236,10 @@ typedef enum {
 } TypeKind;
 
 struct Type {
-  TypeKind Kind; // 种类
-  int Size;      // 大小, sizeof返回的值
-  int Align;     // 对齐
+  TypeKind Kind;   // 种类
+  int Size;        // 大小, sizeof返回的值
+  int Align;       // 对齐
+  bool IsUnsigned; // 是否为无符号的
 
   // 指针
   Type *Base; // 指向的类型
@@ -280,8 +281,15 @@ extern Type *TyShort;
 extern Type *TyInt;
 extern Type *TyLong;
 
+extern Type *TyUChar;
+extern Type *TyUShort;
+extern Type *TyUInt;
+extern Type *TyULong;
+
 // 判断是否为整型
 bool isInteger(Type *TY);
+// 判断是否为无符号小整型
+bool isUWInt(Type *TY);
 // 复制类型
 Type *copyType(Type *Ty);
 // 构建一个指针类型，并指向基类
