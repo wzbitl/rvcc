@@ -147,7 +147,6 @@ static void genAddr(Node *Nd) {
     // Thread-local variable
     if (Nd->Var->IsTLS) {
       printLn("  lui a0, %%tprel_hi(%s)", Nd->Var->Name);
-      printLn("  add a0, a0, tp, %%tprel_add(%s)", Nd->Var->Name);
       printLn("  addi a0, a0, %%tprel_lo(%s)", Nd->Var->Name);
       return;
     }
