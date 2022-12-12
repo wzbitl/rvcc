@@ -17,6 +17,7 @@ typedef enum {
 // 引入路径区
 StringArray IncludePaths;
 bool OptFCommon = true;
+bool OptFPIC;
 
 // -x选项
 static FileType OptX;
@@ -308,6 +309,11 @@ static void parseArgs(int Argc, char **Argv) {
 
     if (!strcmp(Argv[I], "-MMD")) {
       OptMD = OptMMD = true;
+      continue;
+    }
+
+    if (!strcmp(Argv[I], "-fpic") || !strcmp(Argv[I], "-fPIC")) {
+      OptFPIC = true;
       continue;
     }
 
