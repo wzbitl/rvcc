@@ -1531,6 +1531,10 @@ static void genExpr(Node *Nd) {
 
     return;
   }
+  case ND_LABEL_VAL:
+    // printLn("  lea %s(%%rip), %%rax", Nd->UniqueLabel);
+    printLn("  la a0, %s", Nd->UniqueLabel);
+    return;
   default:
     break;
   }
@@ -1912,6 +1916,11 @@ static void genStmt(Node *Nd) {
   // goto语句
   case ND_GOTO:
     printLn("  j %s", Nd->UniqueLabel);
+    return;
+  case ND_GOTO_EXPR:
+    genExpr(Nd->LHS);
+    // println("  jmp *%%rax");
+    printLn("  jr a0");
     return;
   // 标签语句
   case ND_LABEL:
