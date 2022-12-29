@@ -312,3 +312,13 @@ int add_long_double(int a, long double b, float c) {
 
 typedef struct {int a; long double b;} LDSt_1;
 int ld_struct_test_1(LDSt_1 x, int n) {switch(n){case 0:return x.a;break;case 1:return x.b;break;default:return -1;break;}}
+
+// #include <stdatomic.h>
+// int incr(int *p) {
+//   int oldval = *p;
+//   int newval;
+//   do {
+//     newval = oldval + 1;
+//   } while (!atomic_compare_exchange_weak(p, &oldval, newval));
+//   return newval;
+// }

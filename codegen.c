@@ -55,6 +55,14 @@ static void pop(int Reg) {
   Depth--;
 }
 
+// 弹栈，将sp指向的地址的值，弹出到临时寄存器
+static void popT(int Reg) {
+  printLn("  # 弹栈，将栈顶的值存入t%d", Reg);
+  printLn("  ld t%d, 0(sp)", Reg);
+  printLn("  addi sp, sp, 8");
+  Depth--;
+}
+
 // 对于浮点类型进行压栈
 static void pushF(void) {
   printLn("  # 压栈，将fa0的值存入栈顶");
@@ -1555,6 +1563,35 @@ static void genExpr(Node *Nd) {
     // printLn("  lea %s(%%rip), %%rax", Nd->UniqueLabel);
     printLn("  la a0, %s", Nd->UniqueLabel);
     return;
+  case ND_CAS: {
+    printLn("# =====原子比较交换===============");
+    genExpr(Nd->CasAddr);
+    push();
+    genExpr(Nd->CasNew);
+    push();
+    genExpr(Nd->CasOld);
+    load(Nd->CasOld->Ty->Base);
+    // t1旧值
+    printLn("  mv t1, a0");
+    popT(3); // t3新值
+    popT(2); // t2地址
+
+    printLn("  fence iorw, ow");
+    printLn("1:");
+    // 加载地址的值
+    printLn("  lr.w.aq t0, (t2)");
+    // 地址的值和旧值比较，若不等则退出
+    printLn("  bne t0, t1, 2f");
+    // // 写入新值到地址
+    printLn("  sc.w.aq a0, t3, (t2)");
+    // 不为1时，写入失败，重新写入
+    printLn("  bnez a0, 1b");
+    // 对返回值取反后：成功为1，失败为0
+    // TODO：移到2：之后
+    printLn("  seqz a0, a0");
+    printLn("2:");
+    return;
+  }
   default:
     break;
   }
