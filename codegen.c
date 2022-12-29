@@ -1592,6 +1592,17 @@ static void genExpr(Node *Nd) {
     printLn("2:");
     return;
   }
+  case ND_EXCH: {
+    genExpr(Nd->LHS);
+    push();
+    genExpr(Nd->RHS);
+    pop(1);
+
+    int Sz = Nd->LHS->Ty->Base->Size;
+    char *S = (Sz <= 4) ? "w" : "d";
+    printLn("  amoswap.%s.aq a0, a0, (a1)", S);
+    return;
+  }
   default:
     break;
   }
