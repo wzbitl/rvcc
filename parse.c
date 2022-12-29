@@ -159,7 +159,8 @@ static Obj *BuiltinAlloca;
 // structMembers = (declspec declarator (","  declarator)* ";")*
 // structDecl = structUnionDecl
 // unionDecl = structUnionDecl
-// structUnionDecl = ident? ("{" structMembers)?
+// structUnionDecl = attribute? ident? ("{" structMembers)?
+// attribute = ("__attribute__" "(" "(" "packed" ")" ")")?
 // postfix = "(" typeName ")" "{" initializerList "}"
 //         = ident "(" funcArgs ")" postfixTail*
 //         | primary postfixTail*
@@ -3080,8 +3081,26 @@ static void structMembers(Token **Rest, Token *Tok, Type *Ty) {
   Ty->Mems = Head.Next;
 }
 
-// structUnionDecl = ident? ("{" structMembers)?
+// attribute = ("__attribute__" "(" "(" "packed" ")" ")")?
+static Token *attribute(Token *tok, Type *ty) {
+  if (!equal(tok, "__attribute__"))
+    return tok;
+
+  tok = tok->Next;
+  tok = skip(tok, "(");
+  tok = skip(tok, "(");
+  tok = skip(tok, "packed");
+  tok = skip(tok, ")");
+  tok = skip(tok, ")");
+  ty->IsPacked = true;
+  return tok;
+}
+
+// structUnionDecl = attribute? ident? ("{" structMembers)?
 static Type *structUnionDecl(Token **Rest, Token *Tok) {
+  Type *Ty = structType();
+  Tok = attribute(Tok, Ty);
+
   // 读取标签
   Token *Tag = NULL;
   if (Tok->Kind == TK_IDENT) {
@@ -3093,11 +3112,10 @@ static Type *structUnionDecl(Token **Rest, Token *Tok) {
   if (Tag && !equal(Tok, "{")) {
     *Rest = Tok;
 
-    Type *Ty = findTag(Tag);
-    if (Ty)
-      return Ty;
+    Type *Ty2 = findTag(Tag);
+    if (Ty2)
+      return Ty2;
 
-    Ty = structType();
     Ty->Size = -1;
     pushTagScope(Tag, Ty);
     return Ty;
@@ -3107,8 +3125,8 @@ static Type *structUnionDecl(Token **Rest, Token *Tok) {
   Tok = skip(Tok, "{");
 
   // 构造一个结构体
-  Type *Ty = structType();
-  structMembers(Rest, Tok, Ty);
+  structMembers(&Tok, Tok, Ty);
+  *Rest = attribute(Tok, Ty);
 
   // 如果是重复定义，就覆盖之前的定义。否则有名称就注册结构体类型
   if (Tag) {
@@ -3155,13 +3173,14 @@ static Type *structDecl(Token **Rest, Token *Tok) {
       Bits += Mem->BitWidth;
     } else {
       // 常规结构体成员变量
-      Bits = alignTo(Bits, Mem->Align * 8);
+      if (!Ty->IsPacked)
+        Bits = alignTo(Bits, Mem->Align * 8);
       Mem->Offset = Bits / 8;
       Bits += Mem->Ty->Size * 8;
     }
 
     // 类型的对齐值，不小于当前成员变量的对齐值
-    if (Ty->Align < Mem->Align)
+    if (!Ty->IsPacked && Ty->Align < Mem->Align)
       Ty->Align = Mem->Align;
   }
   // 结构体的大小

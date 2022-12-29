@@ -228,7 +228,7 @@ static bool isKeyword(Token *Tok) {
         "restrict",  "__restrict", "__restrict__",
         "_Noreturn", "float",      "double",
         "typeof",    "asm",        "_Thread_local",
-        "__thread",  "_Atomic",
+        "__thread",  "_Atomic",    "__attribute__",
     };
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
