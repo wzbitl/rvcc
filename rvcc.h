@@ -306,6 +306,10 @@ struct Node {
   Node *CasOld;  // 旧值
   Node *CasNew;  // 新值
 
+  // 原子 op= operators
+  Obj *AtomicAddr;
+  Node *AtomicExpr;
+
   Obj *Var;         // 存储ND_VAR种类的变量
   int64_t Val;      // 存储ND_NUM种类的值
   long double FVal; // 存储ND_NUM种类的浮点值
@@ -347,6 +351,7 @@ struct Type {
   int Size;        // 大小, sizeof返回的值
   int Align;       // 对齐
   bool IsUnsigned; // 是否为无符号的
+  bool IsAtomic;  // true if _Atomic
   Type *Origin;    // 原始类型，用于兼容性检查
 
   // 指针

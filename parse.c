@@ -510,6 +510,7 @@ static Type *declspec(Token **Rest, Token *Tok, VarAttr *Attr) {
 
   Type *Ty = TyInt;
   int Counter = 0; // 记录类型相加的数值
+  bool is_atomic = false;
 
   // 遍历所有类型名的Tok
   while (isTypename(Tok)) {
@@ -546,6 +547,16 @@ static Type *declspec(Token **Rest, Token *Tok, VarAttr *Attr) {
         consume(&Tok, Tok, "restrict") || consume(&Tok, Tok, "__restrict") ||
         consume(&Tok, Tok, "__restrict__") || consume(&Tok, Tok, "_Noreturn"))
       continue;
+
+    if (equal(Tok, "_Atomic")) {
+      Tok = Tok->Next;
+      if (equal(Tok, "(")) {
+        Ty = typename(&Tok, Tok->Next);
+        Tok = skip(Tok, ")");
+      }
+      is_atomic = true;
+      continue;
+    }
 
     // _Alignas "(" typeName | constExpr ")"
     if (equal(Tok, "_Alignas")) {
@@ -679,6 +690,11 @@ static Type *declspec(Token **Rest, Token *Tok, VarAttr *Attr) {
 
     Tok = Tok->Next;
   } // while (isTypename(Tok))
+
+  if (is_atomic) {
+    Ty = copyType(Ty);
+    Ty->IsAtomic = true;
+  }
 
   *Rest = Tok;
   return Ty;
@@ -1786,7 +1802,7 @@ static bool isTypename(Token *Tok) {
         "static",     "extern",       "_Alignas",      "signed",   "unsigned",
         "const",      "volatile",     "auto",          "register", "restrict",
         "__restrict", "__restrict__", "_Noreturn",     "float",    "double",
-        "typeof",     "inline",       "_Thread_local", "__thread",
+        "typeof",     "inline",       "_Thread_local", "__thread", "_Atomic",
     };
 
     for (int I = 0; I < sizeof(Kw) / sizeof(*Kw); I++)
@@ -2455,6 +2471,68 @@ static Node *toAssign(Node *Binary) {
     // TMP = &A, (*TMP).X = (*TMP).X op B
     return newBinary(ND_COMMA, Expr1, Expr4, Tok);
   }
+
+  // If A is an atomic type, Convert `A op= B` to
+  //
+  // ({
+  //   T1 *addr = &A; T2 val = (B); T1 old = *addr; T1 new;
+  //   do {
+  //    new = old op val;
+  //   } while (!atomic_compare_exchange_strong(addr, &old, new));
+  //   new;
+  // })
+  if (Binary->LHS->Ty->IsAtomic) {
+    Node Head = {};
+    Node *Cur = &Head;
+
+    Obj *Addr = newLVar("", pointerTo(Binary->LHS->Ty));
+    Obj *Val = newLVar("", Binary->RHS->Ty);
+    Obj *Old = newLVar("", Binary->LHS->Ty);
+    Obj *New = newLVar("", Binary->LHS->Ty);
+
+    Cur = Cur->Next =
+        newUnary(ND_EXPR_STMT,
+                  newBinary(ND_ASSIGN, newVarNode(Addr, Tok),
+                             newUnary(ND_ADDR, Binary->LHS, Tok), Tok),
+                  Tok);
+
+    Cur = Cur->Next = newUnary(
+        ND_EXPR_STMT,
+        newBinary(ND_ASSIGN, newVarNode(Val, Tok), Binary->RHS, Tok), Tok);
+
+    Cur = Cur->Next = newUnary(
+        ND_EXPR_STMT,
+        newBinary(ND_ASSIGN, newVarNode(Old, Tok),
+                   newUnary(ND_DEREF, newVarNode(Addr, Tok), Tok), Tok),
+        Tok);
+
+    Node *Loop = newNode(ND_DO, Tok);
+    Loop->BrkLabel = newUniqueName();
+    Loop->ContLabel = newUniqueName();
+
+    Node *Body = newBinary(ND_ASSIGN, newVarNode(New, Tok),
+                            newBinary(Binary->Kind, newVarNode(Old, Tok),
+                                       newVarNode(Val, Tok), Tok),
+                            Tok);
+
+    Loop->Then = newNode(ND_BLOCK, Tok);
+    Loop->Then->Body = newUnary(ND_EXPR_STMT, Body, Tok);
+
+    Node *Cas = newNode(ND_CAS, Tok);
+    Cas->CasAddr = newVarNode(Addr, Tok);
+    Cas->CasOld = newUnary(ND_ADDR, newVarNode(Old, Tok), Tok);
+    Cas->CasNew = newVarNode(New, Tok);
+    Loop->Cond = newUnary(ND_NOT, Cas, Tok);
+
+    Cur = Cur->Next = Loop;
+    Cur = Cur->Next = newUnary(ND_EXPR_STMT, newVarNode(New, Tok), Tok);
+
+    Node *Nd = newNode(ND_STMT_EXPR, Tok);
+    Nd->Body = Head.Next;
+    return Nd;
+  }
+
+  // Convert `A op= B` to ``tmp = &A, *tmp = *tmp op B`.
 
   // 转换 A op= B为 TMP = &A, *TMP = *TMP op B
   // TMP
