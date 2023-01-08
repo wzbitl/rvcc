@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 将下列代码编译为tmp2.o，"-xc"强制以c语言进行编译
-# cat <<EOF | $RISCV/bin/riscv64-unknown-linux-gnu-gcc -xc -c -o tmp2.o -
-cat <<EOF | gcc -xc -c -o tmp2.o -
+# cat <<EOF | gcc -xc -c -o tmp2.o -
+cat <<EOF | $RISCV/bin/riscv64-unknown-linux-gnu-gcc -xc -c -o tmp2.o -
 int ret3() { return 3; }
 int ret5() { return 5; }
 EOF
