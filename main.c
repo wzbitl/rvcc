@@ -3,7 +3,7 @@
 // 【注意】
 // 如果是交叉编译，请把这个路径改为$RISCV对应的路径
 // 注意 ~ 应替换为具体的 /home/用户名 的路径
-static char *RVPath = "";
+static char *RVPath = "invalid";
 
 // -S选项
 static bool OptS;
