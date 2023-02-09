@@ -182,7 +182,7 @@ static void load(Type *Ty) {
     printLn("  ld a0, 0(a0)");
 }
 
-// 将栈顶值(为一个地址)存入a0
+// 将a0存入栈顶值(为一个地址)指向的内存
 static void store(Type *Ty) {
   pop(1);
 
